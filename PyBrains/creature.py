@@ -21,7 +21,12 @@ class Antenna(Node):
 
     def checkFood(self, food):
         if food.contains(self.x,self.y):
-            self.charge(0.2)
+            # Be attracted towards 'healthy' foods, and away from less nice
+            # things.
+            if food.IMPACT_RATE > 0:
+                self.charge(0.2)
+            elif food.IMPACT_RATE < 0:
+                self.charge(-0.2)
 
 class Eye(Node):
     MAX_CHARGE = 0.2
@@ -204,7 +209,7 @@ class Creature(object):
 
     def eat(self, food):
         if food.size < self.EAT_RATE:
-            self.energy += food.size
+            self.energy += food.size * food.IMPACT_RATE
             food.size = 0
         else:
             food.size -= self.EAT_RATE

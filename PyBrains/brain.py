@@ -1,7 +1,7 @@
 """PyBrains by Ryan Norris"""
 
 from node import Node
-from brainUtils import *
+import brainUtils
 
 class Neuron(Node):
     pass
@@ -79,13 +79,13 @@ class Brain(object):
                 DNA += "1"
             else:
                 DNA += "0"
-            DNA += intToBin(s.permittivity,7)
+            DNA += brainUtils.intToBin(s.permittivity,7)
 
         return DNA
 
     def loadFromDNA(self, DNA):
         for s in self.synapses:
-            s.permittivity = binToInt(DNA[1:8])
+            s.permittivity = brainUtils.binToInt(DNA[1:8])
             if DNA[0]=='1':
                 s.direction = -1
             DNA = DNA[8:]

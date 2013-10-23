@@ -198,10 +198,10 @@ class Artist:
         render = font.render(str(creature.age),True, FONT_COLOUR)
         self.canvas.blit(render,(int(creature.x)-25,int(creature.y)-50))
 
-    def drawFood(self, food):
-        pygame.draw.circle(self.canvas, (200,100,100),
-                           (int(food.x),int(food.y)),int(food.size))
-                           
+    def drawCloud(self, cloud):
+        pygame.draw.circle(self.canvas, cloud.SHADE,
+                           (int(cloud.x),int(cloud.y)),int(cloud.size))
+
     def highlightFood(self, food):
         pygame.draw.circle(self.canvas,(0,200,0),
                            (int(food.x),int(food.y)),

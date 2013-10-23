@@ -1,15 +1,13 @@
 """PyBrains by Ryan Norris"""
 
-import os, sys
 from artist import Artist
 from creature import Creature
-from food import Food
 from textLog import TextLog
+import clouds
 import brainUtils
 import pygame
 import random
-import math
-from pygame.locals import *
+import pygame.locals as key
 
 class Main:
     def __init__(self):
@@ -23,6 +21,7 @@ class Main:
         self.ARENA_HEIGHT = 1400
         self.DRAW_SCALE = 0.5
         self.MAX_FOOD = 50
+        self.MAX_POISON = 20
         self.artist = Artist(self.ARENA_WIDTH, self.ARENA_HEIGHT, scale=self.DRAW_SCALE)
         self.focusedCreature = None
         self.filename = None
@@ -33,7 +32,7 @@ class Main:
         self.creatures = []
         self.dying = []
         self.dead = []
-        self.food = []
+        self.clouds = []
 
     def randomiseCreatures(self, mother=None, father=None):
         self.creatures = []
@@ -47,14 +46,21 @@ class Main:
             self.creatures.append(c)
 
     def randomiseFood(self):
+        """Generate random food clouds."""
         for i in range(self.MAX_FOOD):
-            self.spawnFood()
+            self.spawnCloud(clouds.Food)
 
-    def spawnFood(self):
+    def randomisePoison(self):
+        """Generate random poison clouds."""
+        for i in range(self.MAX_POISON):
+            self.spawnCloud(clouds.Poison)
+
+    def spawnCloud(self, cloudType):
+        """Generates a cloud randomly of the given type."""
         x = (random.random()*(self.ARENA_WIDTH-50) + 50)
         y = (random.random()*(self.ARENA_HEIGHT-50) + 50)
-        f = Food(x,y,40)
-        self.food.append(f)
+        f = cloudType(x, y)
+        self.clouds.append(f)
 
     def save(self):
         f = open("save.txt",'w')
@@ -82,6 +88,7 @@ class Main:
             self.clear()
             self.randomiseCreatures(best1,best2)
             self.randomiseFood()
+            self.randomisePoison()
 
             self.textLog.push("Generation "+str(self.generation)+" survived "+str(self.genTime)+" steps.")
             self.generation += 1
@@ -139,6 +146,7 @@ class Main:
             self.randomiseCreatures()
         finally:
             self.randomiseFood()
+            self.randomisePoison()
             
         running = True
 
@@ -148,28 +156,31 @@ class Main:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                elif event.type == KEYDOWN:
-                    if event.key == K_RETURN:
+                elif event.type == key.KEYDOWN:
+                    if event.key == key.K_RETURN:
                         self.clear()
                         self.randomiseCreatures()
                         self.randomiseFood()
+                        self.randomisePoison()
                         self.generation = 1
                         self.textLog.push("Restarting simulation from generation 1.")
                         self.textLog.push("Spawning 10 random creatures.")
-                    elif event.key == K_z:
+                    elif event.key == key.K_z:
                         self.limitSpeed = not self.limitSpeed
-                    elif event.key == K_x:
+                    elif event.key == key.K_x:
                         self.draw = not self.draw
-                    elif event.key == K_b:
+                    elif event.key == key.K_b:
                         self.drawBrains = not self.drawBrains
-                    elif event.key == K_p:
+                    elif event.key == key.K_p:
                         self.paused = not self.paused
-                    elif event.key == K_s:
+                    elif event.key == key.K_s:
                         self.save()
                         self.textLog.push("Simulation state saved.")
-                elif event.type == MOUSEBUTTONDOWN:
+                elif event.type == key.MOUSEBUTTONDOWN:
+                    # User has clicked - detect which creature (if any) was
+                    # closest.
                     if event.button==1:
-                        d = 100000000
+                        d = 1000
                         closest = None
                         x = event.pos[0] / self.DRAW_SCALE
                         y = event.pos[1] / self.DRAW_SCALE
@@ -179,10 +190,7 @@ class Main:
                                 d = dist
                                 closest = c
 
-                        if d < 1000:
-                            self.focusedCreature = closest
-                        else:
-                            self.focusedCreature = None
+                        self.focusedCreature = closest
 
             if not self.paused:
                 for d in self.dying:
@@ -192,10 +200,16 @@ class Main:
                         self.dead.pop(0)
                 self.dying = []
 
-                for f in self.food:
-                    if f.size<=20:
-                        self.food.remove(f)
-                        self.spawnFood()
+                for f in self.clouds:
+                    if f.size <= f.MIN_SIZE:
+                        self.clouds.remove(f)
+                        if isinstance(f, clouds.Food):
+                            self.spawnCloud(clouds.Food)
+                        elif isinstance(f, clouds.Poison):
+                            self.spawnCloud(clouds.Poison)
+                        else:
+                            self.textLog.push("Error: Unknown cloud type: %s" %
+                                              type(f))
 
                 for c in self.creatures:
                     if c.update() == 0:
@@ -203,11 +217,11 @@ class Main:
                     c.x = min(self.ARENA_WIDTH-25,max(25,c.x))
                     c.y = min(self.ARENA_HEIGHT-25,max(25,c.y))
 
-                    for f in self.food:
+                    for f in self.clouds:
                         if c.canEat(f):
                             c.eat(f)
                     for a in c.antennae+c.eyes:
-                        a.lookAt(self.food)
+                        a.lookAt(self.clouds)
 
                 self.genTime += 1
 
@@ -215,13 +229,13 @@ class Main:
             if self.draw and (self.limitSpeed or counter == 20):
                 self.artist.drawBackground()
                     
-                for f in self.food:
-                    self.artist.drawFood(f)
+                for f in self.clouds:
+                    self.artist.drawCloud(f)
 
                 for d in self.dead:
                     self.artist.drawCreature(d)
 
-                if self.focusedCreature!=None:
+                if self.focusedCreature != None:
                     self.artist.highlight(self.focusedCreature)
                         
                 for c in self.creatures:
@@ -229,11 +243,12 @@ class Main:
                     if self.drawBrains:
                         self.artist.drawCreatureBrain(c)
 
-                if self.focusedCreature!=None:
+                if self.focusedCreature != None:
                     s = 200/self.DRAW_SCALE
                     loc = (int(-s/5), int(-s/8))
                     self.artist.drawCreatureBrain(self.focusedCreature,
-                                              size=s,pos=loc)
+                                                  size=s,
+                                                  pos=loc)
 
                 self.artist.drawTextLog(self.textLog)
                 
